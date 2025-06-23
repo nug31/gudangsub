@@ -30,21 +30,26 @@ console.log('DB_HOST:', process.env.DB_HOST);
 const app = express();
 const PORT = process.env.PORT || 3002;
 
-// Middleware
+// Define allowed origins explicitly
+const ALLOWED_ORIGINS = [
+  'https://gudang.netlify.app',
+  'http://localhost:5173',
+  'http://localhost:3000'
+];
+
+// If CORS_ORIGIN is set and not already in the list, add it
+if (process.env.CORS_ORIGIN && !ALLOWED_ORIGINS.includes(process.env.CORS_ORIGIN)) {
+  ALLOWED_ORIGINS.push(process.env.CORS_ORIGIN);
+}
+
+console.log('Configured CORS origins:', ALLOWED_ORIGINS);
+
+// CORS middleware
 app.use(cors({
   origin: function (origin, callback) {
-    // Remove duplicates and semicolons
-    const allowedOrigins = [...new Set([
-      'https://gudang.netlify.app',
-      'http://localhost:5173',
-      'http://localhost:3000',
-      process.env.CORS_ORIGIN
-    ].filter(Boolean))].map(origin => origin.replace(';', ''));
-    
     console.log('=== CORS Debug Info ===');
     console.log('Request origin:', origin);
-    console.log('Allowed origins:', allowedOrigins);
-    console.log('CORS_ORIGIN env:', process.env.CORS_ORIGIN);
+    console.log('Allowed origins:', ALLOWED_ORIGINS);
     console.log('=====================');
     
     // Allow requests with no origin (like mobile apps or curl requests)
@@ -53,48 +58,50 @@ app.use(cors({
       return callback(null, true);
     }
     
-    // Clean up origin before checking
-    const cleanOrigin = origin.replace(';', '');
-    if (allowedOrigins.includes(cleanOrigin)) {
-      console.log('Origin allowed:', cleanOrigin);
+    if (ALLOWED_ORIGINS.includes(origin)) {
+      console.log('Origin allowed:', origin);
       return callback(null, true);
     }
     
-    console.log('Origin not allowed:', cleanOrigin);
+    console.log('Origin not allowed:', origin);
     return callback(new Error('CORS not allowed'));
   },
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-  exposedHeaders: ['Access-Control-Allow-Origin'],
-  credentials: true,
-  preflightContinue: false,
-  optionsSuccessStatus: 204
+  credentials: true
 }));
 
-// Log all requests including OPTIONS
+// Log all requests
 app.use((req, res, next) => {
+  console.log(`\n=== Incoming Request ===`);
   console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
-  console.log('Request headers:', req.headers);
+  console.log('Headers:', JSON.stringify(req.headers, null, 2));
+  console.log('=====================\n');
   next();
 });
 
-// Add explicit preflight handler with detailed logging
+// Explicit OPTIONS handler for preflight
 app.options('*', (req, res) => {
+  const origin = req.headers.origin;
+  
   console.log('=== Preflight Request ===');
+  console.log('Origin:', origin);
   console.log('Method:', req.method);
   console.log('Path:', req.path);
-  console.log('Origin:', req.headers.origin);
-  console.log('Access-Control-Request-Method:', req.headers['access-control-request-method']);
-  console.log('Access-Control-Request-Headers:', req.headers['access-control-request-headers']);
-  console.log('======================');
+  console.log('Headers:', JSON.stringify(req.headers, null, 2));
+  console.log('=====================');
 
-  res.header('Access-Control-Allow-Origin', req.headers.origin);
-  res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,PATCH,OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-  res.header('Access-Control-Allow-Credentials', 'true');
-  res.status(204).end();
+  // Only set CORS headers if origin is allowed
+  if (ALLOWED_ORIGINS.includes(origin)) {
+    res.header('Access-Control-Allow-Origin', origin);
+    res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,PATCH,OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    res.header('Access-Control-Allow-Credentials', 'true');
+    res.status(204).end();
+  } else {
+    res.status(403).json({ error: 'CORS not allowed for this origin' });
+  }
 });
 
+// Parse JSON bodies
 app.use(express.json());
 
 // Create database pool
