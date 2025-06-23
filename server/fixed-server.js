@@ -17,6 +17,9 @@ app.use(cors({
     // Allow file:// origins for local testing
     if (origin.startsWith('file://')) return callback(null, true);
 
+    // Allow Netlify domain
+    if (origin === 'https://gudang.netlify.app') return callback(null, true);
+
     // Allow configured origins
     if (origin === serverConfig.corsOrigin) return callback(null, true);
 

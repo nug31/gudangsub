@@ -20,7 +20,10 @@ const PORT = serverConfig.port;
 // Middleware
 app.use(
   cors({
-    origin: serverConfig.corsOrigin,
+    origin: [
+      'https://gudang.netlify.app',
+      serverConfig.corsOrigin
+    ].filter(Boolean),
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
     allowedHeaders: ["Content-Type", "Authorization"],
   })
