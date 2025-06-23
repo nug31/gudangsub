@@ -33,37 +33,49 @@ const PORT = process.env.PORT || 3002;
 // Middleware
 app.use(cors({
   origin: function (origin, callback) {
-    const allowedOrigins = [
+    // Remove duplicates using Set
+    const allowedOrigins = [...new Set([
       'https://gudang.netlify.app',
       'http://localhost:5173',
       'http://localhost:3000',
       process.env.CORS_ORIGIN
-    ].filter(Boolean);
+    ].filter(Boolean))];
     
-    console.log('Incoming request from origin:', origin);
+    console.log('=== CORS Debug Info ===');
+    console.log('Request origin:', origin);
+    console.log('Request method:', this.req?.method);
+    console.log('Request path:', this.req?.path);
     console.log('Allowed origins:', allowedOrigins);
+    console.log('CORS_ORIGIN env:', process.env.CORS_ORIGIN);
+    console.log('=====================');
     
     // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) {
+      console.log('No origin, allowing request');
       return callback(null, true);
     }
     
     if (allowedOrigins.includes(origin)) {
+      console.log('Origin allowed:', origin);
       return callback(null, true);
     }
     
-    // If origin not allowed, return false (don't throw error)
+    console.log('Origin not allowed:', origin);
     return callback(null, false);
   },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
+  exposedHeaders: ['Access-Control-Allow-Origin'],
   credentials: true,
   preflightContinue: false,
   optionsSuccessStatus: 204
 }));
 
-// Add OPTIONS handler for preflight
-app.options('*', cors());
+// Add explicit preflight handler
+app.options('*', cors(), (req, res) => {
+  console.log('Handling OPTIONS preflight request');
+  res.status(204).end();
+});
 
 app.use(express.json());
 
