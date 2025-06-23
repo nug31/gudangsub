@@ -33,18 +33,16 @@ const PORT = process.env.PORT || 3002;
 // Middleware
 app.use(cors({
   origin: function (origin, callback) {
-    // Remove duplicates using Set
+    // Remove duplicates and semicolons
     const allowedOrigins = [...new Set([
       'https://gudang.netlify.app',
       'http://localhost:5173',
       'http://localhost:3000',
       process.env.CORS_ORIGIN
-    ].filter(Boolean))];
+    ].filter(Boolean))].map(origin => origin.replace(';', ''));
     
     console.log('=== CORS Debug Info ===');
     console.log('Request origin:', origin);
-    console.log('Request method:', this.req?.method);
-    console.log('Request path:', this.req?.path);
     console.log('Allowed origins:', allowedOrigins);
     console.log('CORS_ORIGIN env:', process.env.CORS_ORIGIN);
     console.log('=====================');
@@ -55,13 +53,15 @@ app.use(cors({
       return callback(null, true);
     }
     
-    if (allowedOrigins.includes(origin)) {
-      console.log('Origin allowed:', origin);
+    // Clean up origin before checking
+    const cleanOrigin = origin.replace(';', '');
+    if (allowedOrigins.includes(cleanOrigin)) {
+      console.log('Origin allowed:', cleanOrigin);
       return callback(null, true);
     }
     
-    console.log('Origin not allowed:', origin);
-    return callback(null, false);
+    console.log('Origin not allowed:', cleanOrigin);
+    return callback(new Error('CORS not allowed'));
   },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
@@ -71,19 +71,31 @@ app.use(cors({
   optionsSuccessStatus: 204
 }));
 
-// Add explicit preflight handler
-app.options('*', cors(), (req, res) => {
-  console.log('Handling OPTIONS preflight request');
+// Log all requests including OPTIONS
+app.use((req, res, next) => {
+  console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
+  console.log('Request headers:', req.headers);
+  next();
+});
+
+// Add explicit preflight handler with detailed logging
+app.options('*', (req, res) => {
+  console.log('=== Preflight Request ===');
+  console.log('Method:', req.method);
+  console.log('Path:', req.path);
+  console.log('Origin:', req.headers.origin);
+  console.log('Access-Control-Request-Method:', req.headers['access-control-request-method']);
+  console.log('Access-Control-Request-Headers:', req.headers['access-control-request-headers']);
+  console.log('======================');
+
+  res.header('Access-Control-Allow-Origin', req.headers.origin);
+  res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,PATCH,OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.header('Access-Control-Allow-Credentials', 'true');
   res.status(204).end();
 });
 
 app.use(express.json());
-
-// Log all requests
-app.use((req, res, next) => {
-  console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
-  next();
-});
 
 // Create database pool
 let pool;
