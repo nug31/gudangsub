@@ -33,6 +33,7 @@ const PORT = process.env.PORT || 3002;
 // Middleware
 app.use(cors({
   origin: [
+    'https://gudang.netlify.app', // domain Netlify cadangan
     'http://localhost:5173',
     'http://localhost:3000',
     'https://gudang-mitra-app.netlify.app',
