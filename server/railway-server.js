@@ -30,20 +30,28 @@ console.log('DB_HOST:', process.env.DB_HOST);
 const app = express();
 const PORT = process.env.PORT || 3002;
 
-// Define allowed origins as strings without semicolons
-const ALLOWED_ORIGINS = [
+// Helper function to clean origin strings
+function cleanOrigin(origin) {
+  if (!origin) return '';
+  return origin
+    .replace(/[;"']/g, '')  // remove quotes and semicolons
+    .trim();  // remove whitespace
+}
+
+// Define base origins
+const baseOrigins = [
   'https://gudang.netlify.app',
   'http://localhost:5173',
   'http://localhost:3000'
-].map(origin => origin.trim());  // Ensure no whitespace
+];
 
-// Add CORS_ORIGIN if set and valid
-if (process.env.CORS_ORIGIN) {
-  const corsOrigin = process.env.CORS_ORIGIN.trim();
-  if (corsOrigin && !ALLOWED_ORIGINS.includes(corsOrigin)) {
-    ALLOWED_ORIGINS.push(corsOrigin);
-  }
-}
+// Clean and deduplicate origins
+const ALLOWED_ORIGINS = [...new Set(
+  baseOrigins
+    .concat(process.env.CORS_ORIGIN ? [process.env.CORS_ORIGIN] : [])
+    .map(cleanOrigin)
+    .filter(Boolean)
+)];
 
 // Log clean configuration
 console.log('=== CORS Configuration ===');
@@ -65,15 +73,18 @@ app.use(cors({
       return callback(null, true);
     }
 
-    // Check if origin is allowed
-    const isAllowed = ALLOWED_ORIGINS.includes(origin.trim());
-    console.log('Origin allowed?', isAllowed);
+    // Clean and check origin
+    const cleanedOrigin = cleanOrigin(origin);
+    const isAllowed = ALLOWED_ORIGINS.includes(cleanedOrigin);
+    
+    console.log('Cleaned origin:', cleanedOrigin);
+    console.log('Is allowed?', isAllowed);
     console.log('=================\n');
 
     if (isAllowed) {
       callback(null, true);
     } else {
-      callback(new Error('CORS not allowed'));
+      callback(new Error(`CORS not allowed for origin: ${cleanedOrigin}`));
     }
   },
   credentials: true,
@@ -86,7 +97,7 @@ app.use((req, res, next) => {
   console.log('Time:', new Date().toISOString());
   console.log('Method:', req.method);
   console.log('Path:', req.url);
-  console.log('Origin:', req.headers.origin || 'No origin');
+  console.log('Origin:', req.headers.origin ? cleanOrigin(req.headers.origin) : 'No origin');
   console.log('Headers:', JSON.stringify(req.headers, null, 2));
   console.log('======================\n');
   next();
@@ -94,10 +105,11 @@ app.use((req, res, next) => {
 
 // Handle preflight requests
 app.options('*', (req, res) => {
-  const origin = req.headers.origin?.trim();
+  const origin = req.headers.origin ? cleanOrigin(req.headers.origin) : null;
   
   console.log('\n=== Preflight Request ===');
-  console.log('Origin:', origin);
+  console.log('Original origin:', req.headers.origin);
+  console.log('Cleaned origin:', origin);
   console.log('Method:', req.method);
   console.log('Path:', req.path);
   console.log('Headers:', JSON.stringify(req.headers, null, 2));
@@ -110,9 +122,12 @@ app.options('*', (req, res) => {
     res.header('Access-Control-Allow-Credentials', 'true');
     res.status(204).end();
   } else {
-    console.log('CORS Preflight Rejected - Origin not allowed:', origin);
+    console.log('CORS Preflight Rejected');
+    console.log('Allowed origins:', ALLOWED_ORIGINS);
+    console.log('Requested origin:', origin);
     res.status(403).json({
       error: 'CORS not allowed for this origin',
+      requestedOrigin: origin,
       allowedOrigins: ALLOWED_ORIGINS
     });
   }
