@@ -32,13 +32,19 @@ const PORT = process.env.PORT || 3002;
 
 // Middleware
 app.use(cors({
-  origin: [
-    'https://gudang.netlify.app', // domain Netlify cadangan
-    'http://localhost:5173',
-    'http://localhost:3000',
-    'https://gudang-mitra-app.netlify.app',
-    process.env.CORS_ORIGIN
-  ].filter(Boolean),
+  origin: function (origin, callback) {
+    const allowedOrigins = [
+      'https://gudang.netlify.app',
+      'http://localhost:5173',
+      'http://localhost:3000',
+      process.env.CORS_ORIGIN
+    ].filter(Boolean);
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
   credentials: true
 }));
